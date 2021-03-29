@@ -1,7 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import List
+from functools import wraps
+from typing import Callable, List
 
 from wumpus.const import ActionType
+from wumpus.errors import InvalidInput
+
+
+def repeat_on_invalid_input(func: Callable):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except InvalidInput:
+                continue
+
+    return wrapper
 
 
 class Controller(ABC):
@@ -46,7 +60,7 @@ class CLIController(Controller):
 
     @staticmethod
     def enter_value():
-        return input("> ")
+        return input("> ").strip()
 
     def error(self, message: str):
         self.display_text(f"ERROR: {message}")
@@ -60,23 +74,31 @@ class CLIController(Controller):
     def lose(self, reason: str):
         self.display_text(f"YOU LOSE!\n{reason.upper()}")
 
+    @repeat_on_invalid_input
     def choose_action(self) -> ActionType:
-        action_options = [f"{action.name} ({action.value})" for action in ActionType]
+        action_options = [
+            f"{action.name} ({action.value})" for action in ActionType
+        ]
 
         self.display_text(f"CHOOSE ACTION: {', '.join(action_options)}?")
         try:
             return ActionType(self.enter_value())
         except ValueError:
-            raise
+            self.error("YOU HAVE NO ANOTHER CHOICE")
+            raise InvalidInput
 
+    @repeat_on_invalid_input
     def choose_direction(self, options: List[int]) -> int:
-        self.display_text(f"CHOOSE ROOM: {', '.join([str(x) for x in options])}?")
+        self.display_text(
+            f"CHOOSE ROOM: {', '.join([str(x) for x in options])}?"
+        )
         try:
             room = int(self.enter_value())
             assert room in options
             return room
-        except ValueError:
-            raise
+        except (ValueError, AssertionError):
+            self.error("YOU HAVE NO ANOTHER CHOICE")
+            raise InvalidInput
 
     def display_room(self, room_id: int, *signs: str):
         self.display_text("\n".join([f"YOU ARE IN ROOM {room_id}", *signs]))
@@ -85,4 +107,6 @@ class CLIController(Controller):
         self.display_text("BATS GRAB YOU AND MOVE TO ANOTHER ROOM")
 
     def shot_missed(self, remaining_arrows: int):
-        self.display_text(f"ARROW MISSED! NOW YOU HAVE {remaining_arrows} ARROWS")
+        self.display_text(
+            f"ARROW MISSED! NOW YOU HAVE {remaining_arrows} ARROWS"
+        )

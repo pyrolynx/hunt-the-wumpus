@@ -1,9 +1,11 @@
 class Room:
-    _game: "Game"
     sign: str = None
     lose_reason: str = None
 
-    def __init__(self, game: "Game"):
+    def __init__(self, game):
+        """
+        :type game: wumpus.game.Game
+        """
         self._game = game
 
     def on_enter(self):

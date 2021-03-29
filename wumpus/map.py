@@ -1,10 +1,12 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List
+
 from wumpus.room import Room
 
 
 @dataclass
-class DecaNode:
+class Node:
     id: int
     room: "Room" = None
 
@@ -17,39 +19,60 @@ class DecaNode:
     def neighborhoods(self):
         return set(self._neighborhoods)
 
-    def connect(self, node: "DecaNode"):
+    def connect(self, node: "Node"):
         assert len(self._neighborhoods) < 3 and len(node._neighborhoods) < 3, (
             self._neighborhoods,
             node._neighborhoods,
         )
-        assert node not in self._neighborhoods and self not in node._neighborhoods
+        assert (
+            node not in self._neighborhoods and self not in node._neighborhoods
+        )
         self._neighborhoods.add(node)
         node._neighborhoods.add(self)
 
     def __hash__(self):
         return self.id
 
-    def __eq__(self, other: "DecaNode"):
+    def __eq__(self, other: "Node"):
         return self.id == other.id
 
 
-class DecaMap:
-    _nodes: Dict[int, DecaNode]
+class Map(ABC):
+    @property
+    @abstractmethod
+    def nodes(self) -> List[Node]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def fill(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def __getitem__(self, node_id: int):
+        raise NotImplementedError
+
+
+class DecaMap(Map):
+    _nodes: Dict[int, Node]
 
     def __init__(self):
         self._nodes = {}
 
     @property
-    def nodes(self):
+    def nodes(self) -> List[Node]:
         return list(self._nodes.values())
 
     def __getitem__(self, node_id):
         return self._nodes[node_id]
 
     def fill(self):
-        nodes = [DecaNode(i) for i in range(1, 21)]
+        nodes = [Node(i) for i in range(1, 21)]
 
-        top_layer, middle_layer, bottom_layer = nodes[:5], nodes[5:15], nodes[15:]
+        top_layer, middle_layer, bottom_layer = (
+            nodes[:5],
+            nodes[5:15],
+            nodes[15:],
+        )
         for i in range(5):
             top_layer[i].connect(top_layer[(i + 1) % 5])
             bottom_layer[i].connect(bottom_layer[(i + 1) % 5])

@@ -1,46 +1,33 @@
 import random
 
-from wumpus import DecaMap, DecaNode, WumpusRoom, PitRoom, BatsRoom
-from wumpus.controller import Controller
 from wumpus.const import ActionType
-from wumpus.room import Room
+from wumpus.controller import Controller
+from wumpus.errors import LoseGame, WinGame
+from wumpus.map import Map, Node
+from wumpus.room import BatsRoom, PitRoom, Room, WumpusRoom
 
 PIT_ROOMS = 3
 BATS_ROOMS = 3
-ARROWS = 5
-
-
-class GameError(Exception):
-    pass
-
-
-class WinGame(GameError):
-    pass
-
-
-class LoseGame(GameError):
-    reason: str
-
-    def __init__(self, reason: str):
-        self.reason = reason
+ARROWS = 2
 
 
 class Game:
-    map: DecaMap
-    wumpus_node: DecaNode
-    player_node: DecaNode
+    map: Map
+    wumpus_node: Node
+    player_node: Node
     arrows: int = ARROWS
     controller: Controller
 
-    def __init__(self, controller: Controller):
+    def __init__(self, controller: Controller, map: Map):
         self.controller = controller
+        self.map = map
 
     def prepare(self):
-        self.map = DecaMap()
         self.map.fill()
-        self.wumpus_node, self.player_node, *traps_nodes = random.choices(
+        self.wumpus_node, self.player_node, *traps_nodes = random.sample(
             self.map.nodes, k=PIT_ROOMS + BATS_ROOMS + 2
         )
+
         self.wumpus_node.room = WumpusRoom(self)
         for _ in range(PIT_ROOMS):
             traps_nodes.pop().room = PitRoom(self)
@@ -57,8 +44,7 @@ class Game:
                 self.controller.display_room(
                     self.player_node.id,
                     *[
-                        # node.room.sign
-                        f"[DEBUG] {node.room.sign} ({node.id}, {node.__class__.__name__})"
+                        node.room.sign
                         for node in self.player_node.neighborhoods
                         if node.room.sign is not None
                     ],
@@ -82,11 +68,11 @@ class Game:
         except LoseGame as e:
             self.controller.lose(e.reason)
 
-    def shot(self, node: DecaNode):
+    def shot(self, node: Node):
         if isinstance(node.room, WumpusRoom):
             raise WinGame
 
-    def move_player(self, node: DecaNode):
+    def move_player(self, node: Node):
         self.player_node = node
         state = self.player_node.room.on_enter()
         if state is None:
@@ -97,8 +83,9 @@ class Game:
             raise LoseGame(self.player_node.room.lose_reason)
 
     def teleport(self):
-        node = random.choice([node for node in self.map.nodes if node != self.player_node])
-        print(f"[DEBUG] Teleporting to ({node.id}, {node.__class__.__name__})")
+        self.controller.teleport()
         self.move_player(
-            node
+            random.choice(
+                [node for node in self.map.nodes if node != self.player_node]
+            )
         )
